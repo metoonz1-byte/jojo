@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Snake — Copy & Paste Game</title>
+  <style>
+    :root{--bg:#0f1724;--panel:#0b1220;--accent:#10b981;--muted:#94a3b8;--danger:#ef4444}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,system-ui,-apple-system,Segoe UI Emoji;background:linear-gradient(180deg,#071023 0%,var(--bg) 100%);color:#e6eef8}
+    .wrap{max-width:900px;margin:28px auto;padding:18px}
+    header{display:flex;align-items:center;gap:12px}
+    h1{font-size:20px;margin:0}
+    .controls{margin-top:14px;display:flex;gap:10px;align-items:center}
+    button{background:var(--panel);border:1px solid rgba(255,255,255,0.04);color:inherit;padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.primary{background:linear-gradient(90deg,var(--accent),#06b6d4);color:#021018;font-weight:600}
+    .info{margin-left:auto;color:var(--muted);font-size:14px}
+    .game-area{margin-top:18px;background:linear-gradient(180deg,#071428, #071225);border-radius:14px;padding:18px;display:grid;grid-template-columns:1fr 230px;gap:16px}
+    .canvas-wrap{background:linear-gradient(180deg,#021625,#071225);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:center}
+    canvas{background:#061122;border-radius:8px;max-width:100%;height:auto}
+    .sidebar{padding:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px}
+    .stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed rgba(255,255,255,0.02);font-size:15px}
+    .muted{color:var(--muted);font-size:13px}
+    .small{font-size:13px}
+    .touchpad{display:flex;gap:8px;margin-top:12px}
+    .tp-btn{flex:1;padding:10px;border-radius:8px;background:rgba(255,255,255,0.03);text-align:center;user-select:none}
+    .footer{margin-top:12px;color:var(--muted);font-size:13px}
+    @media(max-width:720px){
+      .game-area{grid-template-columns:1fr;}
+      .sidebar{order:2}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Snake GGame</h1>
+      <div class="controls">
+        <button id="startBtn" class="primary">Start Game</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="resetBtn">Reset</button>
+        <div class="info">Use Arrows / WASD • Tap controls for mobile</div>
+      </div>
+    </header>
+
+    <div class="game-area">
+      <div class="canvas-wrap">
+        <canvas id="game" width="720" height="480" aria-label="Snake game canvas"></canvas>
+      </div>
+
+      <aside class="sidebar">
+        <div class="stat"><div>Score</div><div id="score">0</div></div>
+        <div class="stat"><div>High Score</div><div id="highscore">0</div></div>
+        <div class="stat"><div>Level</div><div id="level">1</div></div>
+        <div class="stat"><div>Speed</div><div id="speedLabel">Normal</div></div>
+
+        <div style="margin-top:10px" class="small muted">Controls</div>
+        <div class="small">Arrows / WASD — Change direction<br>Space — Pause/Resume<br>R — Reset</div>
+
+        <div style="margin-top:12px" class="small muted">Touch Controls</div>
+        <div class="touchpad">
+          <div class="tp-btn" id="tpUp">Up</div>
+        </div>
+        <div class="touchpad">
+          <div class="tp-btn" id="tpLeft">Left</div>
+          <div class="tp-btn" id="tpDown">Down</div>
+          <div class="tp-btn" id="tpRight">Right</div>
+        </div>
+
+
+      </aside>
+    </div>
+  </div>
+
+  <script>
+  (()=>{
+    const canvas=document.getElementById('game');const ctx=canvas.getContext('2d');
+    const startBtn=document.getElementById('startBtn');const pauseBtn=document.getElementById('pauseBtn');const resetBtn=document.getElementById('resetBtn');
+    const scoreEl=document.getElementById('score');const highEl=document.getElementById('highscore');const levelEl=document.getElementById('level');const speedLabel=document.getElementById('speedLabel');
+    const tpUp=document.getElementById('tpUp');const tpLeft=document.getElementById('tpLeft');const tpDown=document.getElementById('tpDown');const tpRight=document.getElementById('tpRight');
+    const GRID=20;const COLS=Math.floor(canvas.width/GRID);const ROWS=Math.floor(canvas.height/GRID);
+    let snake=[],dir={x:1,y:0},nextDir={x:1,y:0},apple=null,score=0,highscore=Number(localStorage.getItem('snake_high')||0),level=1,speed=8,running=false,paused=false,lastTime=0;
+    highEl.textContent=highscore;
+    function resetGame(){snake=[{x:Math.floor(COLS/2)-1,y:Math.floor(ROWS/2)},{x:Math.floor(COLS/2)-2,y:Math.floor(ROWS/2)}];dir={x:1,y:0};nextDir={x:1,y:0};score=0;level=1;speed=8;paused=false;running=false;placeApple();updateUI();draw();}
+    function startGame(){if(running)return;running=true;paused=false;lastTime=performance.now();loop();}
+    function pauseGame(){if(!running)return;paused=!paused;pauseBtn.textContent=paused?'Resume':'Pause';if(!paused)loop();}
+    function placeApple(){while(true){const x=Math.floor(Math.random()*COLS),y=Math.floor(Math.random()*ROWS);if(!snake.some(s=>s.x===x&&s.y===y)){apple={x,y};break;}}}
+    function tick(){dir=nextDir;const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(head.x<0)head.x=COLS-1;if(head.x>=COLS)head.x=0;if(head.y<0)head.y=ROWS-1;if(head.y>=ROWS)head.y=0;
+      if(snake.some((s,i)=>i>0&&s.x===head.x&&s.y===head.y)){running=false;paused=false;alert('Game Over! Score: '+score);if(score>highscore){highscore=score;localStorage.setItem('snake_high',highscore);}highEl.textContent=highscore;pauseBtn.textContent='Pause';return resetGame();}
+      snake.unshift(head);if(apple&&head.x===apple.x&&head.y===apple.y){score+=10;level=Math.floor(score/50)+1;speed=8+(level-1)*2;placeApple();}else{snake.pop();}updateUI();}
+    function updateUI(){scoreEl.textContent=score;levelEl.textContent=level;speedLabel.textContent=speed<=8?'Normal':(speed<=12?'Fast':'Very Fast');}
+    function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#061226';ctx.fillRect(0,0,canvas.width,canvas.height);
+      if(apple){drawCell(apple.x,apple.y,'#ef4444');ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fillRect(apple.x*GRID+4,apple.y*GRID+4,GRID-8,GRID-8);}
+      for(let i=0;i<snake.length;i++){const s=snake[i];const t=i===0?1:(1-Math.min(i/12,0.65));const hue=160-Math.min(i*3,60);ctx.fillStyle=`hsl(${hue} 70% ${30+t*20}%)`;ctx.fillRect(s.x*GRID+1,s.y*GRID+1,GRID-2,GRID-2);
+        if(i===0){ctx.fillStyle='#021018';const ex=(dir.x>0?0.6:dir.x<0?0.2:0.5);const ey=(dir.y>0?0.6:dir.y<0?0.2:0.5);ctx.fillRect(s.x*GRID+Math.round(GRID*ex),s.y*GRID+Math.round(GRID*ey),4,4);}}}
+    function drawCell(x,y,color){ctx.fillStyle=color;ctx.fillRect(x*GRID+1,y*GRID+1,GRID-2,GRID-2);}
+    function loop(now){if(!running||paused)return;const secs=(now-lastTime)/1000;const interval=1/Math.max(1,speed);if(secs>=interval){lastTime=now;tick();draw();}requestAnimationFrame(loop);}
+    function changeDir(x,y){if(x===-dir.x&&y===-dir.y)return;nextDir={x,y};if(!running)startGame();}
+    window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k==='arrowup'||k==='w')changeDir(0,-1);if(k==='arrowdown'||k==='s')changeDir(0,1);if(k==='arrowleft'||k==='a')changeDir(-1,0);if(k==='arrowright'||k==='d')changeDir(1,0);if(k===' ')pauseGame();if(k==='r')resetGame();});
+    tpUp.onclick=()=>changeDir(0,-1);tpLeft.onclick=()=>changeDir(-1,0);tpDown.onclick=()=>changeDir(0,1);tpRight.onclick=()=>changeDir(1,0);
+    startBtn.onclick=()=>startGame();pauseBtn.onclick=()=>pauseGame();resetBtn.onclick=()=>resetGame();
+    resetGame();
+  })();
+  </script>
+</body>
+</html>
